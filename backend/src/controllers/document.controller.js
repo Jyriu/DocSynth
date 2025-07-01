@@ -27,20 +27,6 @@ exports.create = async (req, res) => {
   }
 };
 
-exports.getOne = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const doc = await Document.findById(id).lean();
-    if (!doc) return res.status(404).json({ message: 'Document not found' });
-
-    const summaries = await Summary.find({ documentId: id }).lean();
-    res.json({ ...doc, summaries });
-  } catch (err) {
-    console.error('Error fetching document:', err);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
 exports.getMine = async (req, res) => {
   try {
     const ownerId = req.user?.id;
