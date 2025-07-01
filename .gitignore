@@ -13,3 +13,6 @@ build/
 # Environnement
 .env
 .env.*
+
+# Uploads
+uploads/

@@ -3,10 +3,9 @@ const { Schema } = mongoose;
 
 const DocumentSchema = new Schema({
   title: { type: String, required: true },
-  source: { type: String },
-  rawText: { type: String, required: true },
+  filename: { type: String, required: true }, // name of the uploaded file
+  filepath: { type: String, required: true }, // path to where it's stored
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  language: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
 
