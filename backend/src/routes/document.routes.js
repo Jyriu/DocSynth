@@ -1,9 +1,12 @@
-const router = require('express').Router();
+const express = require('express');
+const router = express.Router();
 const multer = require('multer');
-const ctrl = require('../controllers/document.controller');
 const auth = require('../middlewares/auth.middleware');
+const documentController = require('../controllers/document.controller');
 
-// Stocker dans ./uploads/
+// -----------------------------
+// CONFIG MULTER
+// -----------------------------
 const storage = multer.diskStorage({
   destination: function (_, __, cb) {
     cb(null, 'uploads/');
@@ -15,7 +18,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-router.post('/', auth, upload.single('file'), ctrl.create);
-router.get('/mine', auth, ctrl.getMine);
+
+// -----------------------------
+// DOCUMENT ROUTES
+// -----------------------------
+router.post('/', auth, upload.single('file'), documentController.create);
+router.get('/mine', auth, documentController.getMine);
+
 
 module.exports = router;

@@ -1,14 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { register as registerApi, login as loginApi } from '../utils/api';
+import { AuthContext } from '../contexts/AuthContext';
+import { saveToken } from '../utils/auth';
+import { useNavigate } from 'react-router-dom';
 
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { setIsAuthenticated } = useContext(AuthContext);
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    alert(`Inscription de ${name}`);
+    setError('');
+    try {
+      setLoading(true);
+      await registerApi(name, email, password);
+      // Après inscription réussie, connecter automatiquement l'utilisateur
+      const loginRes = await loginApi(email, password);
+      saveToken(loginRes.token);
+      setIsAuthenticated(true);
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Erreur lors de l\'inscription');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,9 +92,10 @@ const Register = () => {
               </button>
             </div>
           </div>
-          <button type="submit" className="btn btn-dark btn-lg w-100 rounded-3 mb-3" style={{ background: '#111', border: 'none' }}>
-            S'inscrire
+          <button type="submit" className="btn btn-dark btn-lg w-100 rounded-3 mb-3" style={{ background: '#111', border: 'none' }} disabled={loading}>
+            {loading ? 'Inscription...' : 'S\'inscrire'}
           </button>
+          {error && <div className="alert alert-danger mt-2">{error}</div>}
         </form>
         <div className="text-center mt-2">
           <span className="text-secondary small">Déjà un compte ?</span>

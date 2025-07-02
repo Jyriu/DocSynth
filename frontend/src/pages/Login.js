@@ -1,13 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { login as loginApi } from '../utils/api';
+import { AuthContext } from '../contexts/AuthContext';
+import { saveToken } from '../utils/auth';
+import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { setIsAuthenticated } = useContext(AuthContext);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    alert(`Connexion avec ${email}`);
+    setError('');
+    try {
+      setLoading(true);
+      const res = await loginApi(email, password);
+      saveToken(res.token);
+      setIsAuthenticated(true);
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      setError('Email ou mot de passe incorrect');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,9 +74,10 @@ const Login = () => {
               </button>
             </div>
           </div>
-          <button type="submit" className="btn btn-dark btn-lg w-100 rounded-3 mb-3" style={{ background: '#111', border: 'none' }}>
-            Se connecter
+          <button type="submit" className="btn btn-dark btn-lg w-100 rounded-3 mb-3" style={{ background: '#111', border: 'none' }} disabled={loading}>
+            {loading ? 'Connexion…' : 'Se connecter'}
           </button>
+          {error && <div className="alert alert-danger mt-2">{error}</div>}
         </form>
         <div className="text-center mt-2">
           <span className="text-secondary small">Pas encore de compte ?</span>

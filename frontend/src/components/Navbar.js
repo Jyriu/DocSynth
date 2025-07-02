@@ -1,22 +1,40 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useContext } from 'react';
+import { Link } from 'react-router-dom';
+import { AuthContext } from '../contexts/AuthContext';
+import { clearToken } from '../utils/auth';
 
 const Navbar = () => {
-  const location = useLocation();
-  const isHome = location.pathname === '/';
+  const { isAuthenticated, setIsAuthenticated } = useContext(AuthContext);
+
+  const handleLogout = () => {
+    clearToken();
+    setIsAuthenticated(false);
+  };
 
   return (
-    <nav className="navbar navbar-expand-lg bg-white border-bottom shadow-sm py-3">
-      <div className="container-fluid">
-        <Link className="navbar-brand fw-bold fs-4" style={{ color: '#111' }} to="/">ComplySummarize IA</Link>
-        <div className="d-flex align-items-center gap-2">
-          {isHome ? (
-            <button className="btn btn-dark btn-lg rounded-3" style={{ background: '#111', border: 'none' }}>Déconnexion</button>
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div className="container">
+        <Link className="navbar-brand fw-bold" to="/">
+          ComplySummarize AI
+        </Link>
+        
+        <div className="navbar-nav ms-auto">
+          {isAuthenticated ? (
+            <button 
+              className="btn btn-outline-light" 
+              onClick={handleLogout}
+            >
+              Déconnexion
+            </button>
           ) : (
-            <>
-              <Link className="btn btn-outline-dark btn-lg rounded-3 me-2" to="/login" style={{ borderWidth: 2 }}>Connexion</Link>
-              <Link className="btn btn-dark btn-lg rounded-3" to="/register" style={{ background: '#111', border: 'none' }}>Inscription</Link>
-            </>
+            <div className="d-flex gap-2">
+              <Link to="/login" className="btn btn-outline-light">
+                Connexion
+              </Link>
+              <Link to="/register" className="btn btn-light">
+                Inscription
+              </Link>
+            </div>
           )}
         </div>
       </div>
