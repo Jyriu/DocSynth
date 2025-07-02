@@ -13,6 +13,12 @@ build/
 # Environnement
 .env
 .env.*
+
 .history
 .lh
 .vscode
+
+
+# Uploads
+uploads/
+
