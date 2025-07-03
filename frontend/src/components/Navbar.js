@@ -20,12 +20,17 @@ const Navbar = () => {
         
         <div className="navbar-nav ms-auto">
           {isAuthenticated ? (
-            <button 
-              className="btn btn-outline-light" 
-              onClick={handleLogout}
-            >
-              Déconnexion
-            </button>
+            <div className="d-flex gap-2 align-items-center">
+              <Link to="/history" className="btn btn-outline-light">
+                Historique
+              </Link>
+              <button 
+                className="btn btn-outline-light" 
+                onClick={handleLogout}
+              >
+                Déconnexion
+              </button>
+            </div>
           ) : (
             <div className="d-flex gap-2">
               <Link to="/login" className="btn btn-outline-light">

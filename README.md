@@ -1,83 +1,95 @@
 # ComplySummarize AI
 
-Application de résumé de documents utilisant l'intelligence artificielle via Hugging Face.
+Application full-stack (React + Express/Mongo) permettant :
 
-## Fonctionnalités
+1. l'upload de documents PDF ;
+2. l'extraction du texte ;
+3. la génération de résumés IA via l'API Mistral ;
+4. la consultation de l'historique de ses résumés ;
+5. le téléchargement du résumé au format PDF.
 
-- ✅ Inscription et connexion des utilisateurs
-- ✅ Upload et traitement de fichiers PDF
-- ✅ Génération de résumés avec Hugging Face (BART)
-- ✅ Interface utilisateur moderne avec Bootstrap
-- ✅ Authentification JWT
+## Fonctionnalités principales
+
+- ✅ Inscription / connexion (JWT)
+- ✅ Upload de fichiers PDF
+- ✅ Résumé IA automatique (Mistral 7B)
+- ✅ Historique utilisateur (documents + résumés)
+- ✅ Export PDF du résumé (jsPDF)
+- ✅ Interface moderne Bootstrap 5
 
 ## Prérequis
 
-1. **Node.js** (version 16 ou plus récente)
-2. **MongoDB** (démarré sur le port par défaut 27017)
-3. **Clé API Hugging Face** (gratuite sur https://huggingface.co)
+1. **Node.js** ≥ 18
+2. **MongoDB** (local ou distant)
+3. **Clé API Mistral** ➜ https://console.mistral.ai/
 
 ## Configuration
 
-### Backend (.env)
-Créez un fichier `.env` dans le dossier `backend/` :
+### Backend (`backend/.env`)
 ```
 PORT=4000
 MONGO_URI=mongodb://127.0.0.1:27017/complysummarize
-JWT_SECRET=votre_secret_jwt_très_sécurisé_ici_changez_moi
+JWT_SECRET=change_me
+# Clé et modèle Mistral
+MISTRAL_API_KEY=sk-xxxxxxxxxxxxxxxx
+MISTRAL_MODEL=mistral-small-latest        # optionnel (défaut)
 NODE_ENV=development
-HUGGING_FACE_API_KEY=votre_clé_hugging_face_ici
 ```
 
-### Frontend (.env)  
-Créez un fichier `.env` dans le dossier `frontend/` :
+### Frontend (`frontend/.env`)
 ```
 REACT_APP_API_URL=http://localhost:4000
 ```
 
-## Démarrage
+## Lancer l'application
 
-### Option 1: Script automatique (Windows)
+### Script Windows
 ```powershell
-.\start-dev.ps1
+./start-dev.ps1    # démarre backend + frontend
 ```
 
-### Option 2: Démarrage manuel
-
-**Terminal 1 - Backend:**
+### Manuel
 ```bash
-cd backend
-npm run dev
-```
+# Terminal 1 – Backend
+yarn install && yarn dev   # ou npm
 
-**Terminal 2 - Frontend:**
-```bash
+# Terminal 2 – Frontend
 cd frontend
-npm start
+yarn install && yarn start
 ```
 
-## Utilisation
-
-1. Ouvrez http://localhost:3000
-2. Créez un compte ou connectez-vous
-3. Uploadez un fichier PDF
-4. Obtenez un résumé généré par IA via Hugging Face
+Accédez ensuite à http://localhost:3000.
 
 ## Architecture
 
-- **Frontend**: React + Bootstrap + Context API
-- **Backend**: Express.js + MongoDB + JWT
-- **IA**: Hugging Face API avec modèle BART
-- **Traitement**: pdf-parse pour l'extraction de texte
+| Couche | Techno | Détails |
+|--------|--------|---------|
+| Frontend | React 19, React-Router 6, Bootstrap 5 | AuthContext + pages Home, Login, Register, History |
+| Backend | Express 4, MongoDB, JWT | Routes : `/auth`, `/summaries`, `/documents` |
+| IA | Mistral API (`chat/completions`) | Adaptation du prompt + découpe intelligente des textes volumineux |
 
-## Modèles IA utilisés
+### Flux de résumé
+1. PDF envoyé (`/summaries/generate`, JWT obligatoire).
+2. Texte extrait via `pdf-parse`.
+3. Calcul de la taille : 
+   - si ≤ 7 000 tokens → résumé direct ;
+   - sinon → découpe en blocs + résumé final.
+4. Résumé stocké (`Summary`), lié au `Document` et à l'utilisateur.
+5. Le frontend récupère `/summaries/history/me` pour lister l'historique.
 
-- **Principal**: `facebook/bart-large-cnn` (résumé en anglais)
-- **Alternatifs**: 
-  - `csebuetnlp/mT5_multilingual_XLSum` (multilingue)
-  - `moussaKam/barthez-orangesum-abstract` (français)
+## Mise à jour 2025-07
+
+- Passage de Hugging Face → Mistral API (plus stable, meilleur français).
+- Ajout de la page Historique + export PDF.
+- Nettoyage des secrets hard-codés.
+- Journalisation restreinte à `NODE_ENV !== 'production'.`
 
 ## Dépannage
 
-- Vérifiez que MongoDB est démarré
-- Vérifiez votre clé API Hugging Face
-- Les modèles peuvent prendre quelques secondes à démarrer (erreur 503) 
+- **MongoDB** : service lancé ? port correct ?
+- **Mistral 429** : l'API peut retourner « capacity » ; réessaie après quelques secondes.
+- **Env manquant** : l'app lève une erreur claire si `JWT_SECRET` ou `MISTRAL_API_KEY` absent.
+
+---
+
+© 2025 ComplySummarize IA – Licence MIT 

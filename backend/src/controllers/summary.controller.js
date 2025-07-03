@@ -1,7 +1,8 @@
 const extractText = require('../utils/textExtractor');
 const Document = require('../models/Document');
 const Summary = require('../models/Summary');
-const summarizeWithHuggingFace = require('../services/huggingface.service');
+const summarizeWithMistral = require('../services/mistral.service');
+const isDev = process.env.NODE_ENV !== 'production';
 
 // POST /summaries/generate (auth)
 // Accepts multipart/form-data with either:
@@ -18,7 +19,7 @@ exports.generate = async (req, res) => {
     if (req.file) {
       // Extraire le texte du fichier uploadé (PDF ou texte)
       rawText = await extractText(req.file);
-      console.log(`📄 Texte extrait: ${rawText.length} caractères`);
+      if (isDev) console.log(`📄 Texte extrait: ${rawText.length} caractères`);
       
       // Créer un document en base pour l'historique
       const doc = await Document.create({
@@ -38,103 +39,64 @@ exports.generate = async (req, res) => {
 
     let finalSummary;
 
-    // Stratégie complète : traiter TOUT le document
-    if (rawText.length <= 1000) {
-      // Document court : résumé direct avec extraction d'idées clés
-      console.log('📝 Document court: résumé direct avec idées clés');
-      finalSummary = await summarizeWithHuggingFace(rawText, { 
-        promptType: 'key_ideas' 
+    // Fonction utilitaire pour estimer grossièrement les tokens (≈ 4 caractères par token)
+    const estimateTokens = (txt) => Math.ceil(txt.length / 4);
+    const tokenCount = estimateTokens(rawText);
+    const DIRECT_THRESHOLD = 7000; // on garde une marge de sécurité (modèle 8k)
+
+    if (isDev) console.log(`📏 Longueur document: ${rawText.length} caractères ≈ ${tokenCount} tokens`);
+
+    if (tokenCount <= DIRECT_THRESHOLD) {
+      // -----------------------------
+      // CAS 1: document assez petit ⇒ résumé direct sans condensation
+      // -----------------------------
+      if (isDev) console.log('🟢 Taille adaptée: résumé direct SANS condensation');
+      finalSummary = await summarizeWithMistral(rawText, {
+        promptType: 'summary'
       });
-      
+
     } else {
-      // Document long : découpage complet + résumé consolidé
-      console.log('📝 Document long: traitement complet par chunks');
-      
-      const chunkSize = 1000;
-      const chunks = splitTextIntelligent(rawText, chunkSize);
-      console.log(`🔧 Document découpé en ${chunks.length} chunks de ~${chunkSize} caractères`);
-      
-      const keyIdeasFromChunks = [];
-      
-      // Étape 1: Extraire les idées principales de chaque chunk
-      console.log('🔍 Étape 1: Extraction des idées principales de chaque section...');
-      
-      for (let i = 0; i < chunks.length; i++) {
+      // -----------------------------
+      // CAS 2: document trop grand ⇒ découpe en BLOCS MAX + résumés directs
+      // -----------------------------
+      if (isDev) console.log('🟠 Document volumineux: découpe en blocs max + résumés intermédiaires');
+
+      const CHAR_THRESHOLD = DIRECT_THRESHOLD * 4; // ≈ 28 000 caractères
+      const blocks = splitTextIntelligent(rawText, CHAR_THRESHOLD);
+      if (isDev) console.log(`🔧 Document découpé en ${blocks.length} blocs de ~${CHAR_THRESHOLD} caractères`);
+
+      const blockSummaries = [];
+      for (let i = 0; i < blocks.length; i++) {
         try {
-          console.log(`🔄 Traitement section ${i+1}/${chunks.length}`);
-          
-          const chunkSummary = await summarizeWithHuggingFace(chunks[i], { 
-            promptType: 'key_ideas'
+          if (isDev) console.log(`📑 Résumé bloc ${i + 1}/${blocks.length}`);
+          const blockSummary = await summarizeWithMistral(blocks[i], {
+            promptType: 'summary'
           });
-          
-          keyIdeasFromChunks.push({
-            section: i + 1,
-            ideas: chunkSummary
-          });
-          
-          // Pause pour éviter les rate limits
-          if (i < chunks.length - 1) {
-            const pauseTime = chunks.length > 10 ? 3000 : 2000;
-            console.log(`⏸️ Pause de ${pauseTime/1000}s avant section suivante...`);
-            await new Promise(resolve => setTimeout(resolve, pauseTime));
+          blockSummaries.push(blockSummary);
+          if (i < blocks.length - 1) {
+            await new Promise(r => setTimeout(r, 2000));
           }
-          
-        } catch (error) {
-          console.warn(`⚠️ Erreur section ${i+1}:`, error.message);
-          
-          if (error.message.includes('429')) {
-            console.log('⏸️ Rate limit atteint, pause de 15 secondes...');
-            await new Promise(resolve => setTimeout(resolve, 15000));
-            i--; // Retry la même section
+        } catch (err) {
+          console.warn(`⚠️ Erreur résumé bloc ${i + 1}:`, err.message);
+          if (err.message.includes('429')) {
+            if (isDev) console.log('⏸️ Pause 30s pour rate limit...');
+            await new Promise(r => setTimeout(r, 30000));
+            i--; // retry bloc
             continue;
           }
-          
-          // Continuer même en cas d'erreur sur une section
+          blockSummaries.push(blocks[i].slice(0, 1000)); // fallback brut
         }
       }
-      
-      if (keyIdeasFromChunks.length === 0) {
-        throw new Error('Impossible d\'extraire les idées du document');
-      }
-      
-      console.log(`✅ Idées extraites de ${keyIdeasFromChunks.length} sections`);
-      
-      // Étape 2: Synthèse finale de toutes les idées principales
-      console.log('🎯 Étape 2: Synthèse finale des grandes lignes...');
-      
-      const allIdeas = keyIdeasFromChunks
-        .map(item => `Section ${item.section}: ${item.ideas}`)
-        .join('\n\n');
-      
-      // Traiter la synthèse finale par chunks si nécessaire
-      if (allIdeas.length <= 1000) {
-        finalSummary = await summarizeWithHuggingFace(allIdeas, { 
-          promptType: 'final_synthesis'
-        });
+
+      const combinedSummaryInput = blockSummaries.join('\n\n');
+
+      if (blockSummaries.length === 1) {
+        // Un seul bloc => déjà le résumé final
+        finalSummary = blockSummaries[0];
       } else {
-        // Si les idées combinées sont trop longues, les chunker aussi
-        const ideaChunks = splitTextIntelligent(allIdeas, 800);
-        const finalIdeas = [];
-        
-        for (let i = 0; i < ideaChunks.length; i++) {
-          try {
-            const partialSynthesis = await summarizeWithHuggingFace(ideaChunks[i], { 
-              promptType: 'final_synthesis'
-            });
-            finalIdeas.push(partialSynthesis);
-            
-            if (i < ideaChunks.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-          } catch (error) {
-            console.warn(`⚠️ Erreur synthèse ${i+1}:`, error.message);
-          }
-        }
-        
-        // Synthèse ultime des synthèses
-        const combinedFinalIdeas = finalIdeas.join(' ');
-        finalSummary = await summarizeWithHuggingFace(combinedFinalIdeas, { 
-          promptType: 'final_synthesis'
+        if (isDev) console.log('🎯 Résumé final des résumés de blocs...');
+        finalSummary = await summarizeWithMistral(combinedSummaryInput, {
+          promptType: 'summary'
         });
       }
     }
@@ -144,17 +106,19 @@ exports.generate = async (req, res) => {
       documentId,
       summaryText: finalSummary,
       status: 'termine',
-      modelUsed: 'huggingface/bart-large-cnn-complete'
+      modelUsed: 'mistral-large-latest'
     });
 
-    console.log('✅ Résumé complet généré avec succès');
-    console.log(`📊 Résumé final: ${finalSummary.length} caractères`);
-    
+    if (isDev) {
+      console.log('✅ Résumé Mistral Pro généré avec succès');
+      console.log(`📊 Résumé final: ${finalSummary.length} caractères`);
+    }
+
     res.status(201).json(summary);
   } catch (error) {
-    console.error('❌ Erreur génération résumé:', error);
+    console.error('❌ Erreur génération résumé Mistral:', error);
     res.status(500).json({ 
-      message: 'Erreur lors de la génération du résumé',
+      message: 'Erreur lors de la génération du résumé avec Mistral',
       error: error.message 
     });
   }
@@ -163,7 +127,9 @@ exports.generate = async (req, res) => {
 // GET /summaries/by-user/:userId
 exports.getByUser = async (req, res) => {
   try {
-    const summaries = await Summary.find({ userId: req.params.userId });
+    const summaries = await Summary.find({ userId: req.params.userId })
+      .populate('documentId', 'title createdAt')
+      .sort({ createdAt: -1 });
     res.json(summaries);
   } catch (err) {
     console.error(err);
@@ -177,6 +143,20 @@ exports.getOne = async (req, res) => {
     const summary = await Summary.findById(req.params.id);
     if (!summary) return res.status(404).json({ message: 'Summary not found' });
     res.json(summary);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// GET /summaries/history/me (auth)
+exports.historyMe = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const summaries = await Summary.find({ userId })
+      .populate('documentId', 'title createdAt')
+      .sort({ createdAt: -1 });
+    res.json(summaries);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Internal server error' });

@@ -7,6 +7,7 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() }); // keep file in memory
 
 router.post('/generate', auth, upload.single('file'), ctrl.generate);
+router.get('/history/me', auth, ctrl.historyMe);
 router.get('/by-user/:userId', auth, ctrl.getByUser);
 router.get('/:id', auth, ctrl.getOne);
 

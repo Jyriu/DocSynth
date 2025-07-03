@@ -1,6 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { summarisePdf } from '../utils/api';
 import { getToken } from '../utils/auth';
+import { marked } from 'marked';
+import { jsPDF } from 'jspdf';
+
+// Sécurité minimale : désactiver HTML dans markdown (bold/**, italique/* etc.) mais pas de balises <script>
+marked.setOptions({
+  breaks: true,
+  mangle: false,
+  headerIds: false,
+});
 
 const Home = () => {
   const fileInputRef = useRef();
@@ -45,6 +54,44 @@ const Home = () => {
     setSummary('');
   };
 
+  const handleDownloadPdf = () => {
+    if (!summary) return;
+
+    // Crée le document PDF en format A4 portrait.
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'p' });
+
+    // Marges et largeur maximale du texte.
+    const marginLeft = 15;
+    const marginTop = 20;
+    const maxLineWidth = 180; // 210 mm - 2 * 15 mm de marge
+    const lineHeight = 7;
+
+    // Titre optionnel avec nom de fichier.
+    if (fileName) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Résumé de : ${fileName}`, marginLeft, marginTop - 8);
+    }
+
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+
+    // Découper le texte pour tenir dans la largeur.
+    const lines = doc.splitTextToSize(summary, maxLineWidth);
+
+    let y = marginTop;
+    lines.forEach((line) => {
+      if (y > 280) { // proche du bas de page, on ajoute une nouvelle page
+        doc.addPage();
+        y = marginTop;
+      }
+      doc.text(line, marginLeft, y);
+      y += lineHeight;
+    });
+
+    doc.save('resume.pdf');
+  };
+
   return (
     <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
       <div className="card p-5 shadow-lg rounded-4 w-100" style={{ maxWidth: '48rem' }}>
@@ -73,10 +120,15 @@ const Home = () => {
         {summary && (
           <div className="mb-4">
             <h5 className="fw-bold mb-2">Résumé :</h5>
-            <div className="bg-light rounded border p-3" style={{ minHeight: 120 }}>
-              {summary.split('\n').map((line, idx) => (
-                <div key={idx} className="text-start">{line}</div>
-              ))}
+            <div
+              className="bg-light rounded border p-3 text-start"
+              style={{ maxHeight: '50vh', overflowY: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: marked.parse(summary) }}
+            />
+            <div className="d-flex justify-content-end mt-2">
+              <button className="btn btn-dark btn-sm" onClick={handleDownloadPdf}>
+                Télécharger le résumé (PDF)
+              </button>
             </div>
           </div>
         )}

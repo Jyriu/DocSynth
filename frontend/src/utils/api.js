@@ -38,15 +38,15 @@ export async function summarisePdf(file, token) {
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
 
   try {
-    const res = await fetch(`${BASE_URL}/summaries/generate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+  const res = await fetch(`${BASE_URL}/summaries/generate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
       body: formData,
       signal: controller.signal
-    });
+  });
     
     clearTimeout(timeoutId);
-    return handleResponse(res);
+  return handleResponse(res);
   } catch (error) {
     clearTimeout(timeoutId);
     
@@ -56,4 +56,11 @@ export async function summarisePdf(file, token) {
     
     throw error;
   }
+}
+
+export async function fetchHistory(token) {
+  const res = await fetch(`${BASE_URL}/summaries/history/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return handleResponse(res);
 }

@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Navbar } from './components';
-import { Login, Register, Home } from './pages';
+import { Login, Register, Home, History } from './pages';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthContext } from './contexts/AuthContext';
@@ -31,6 +31,14 @@ function App() {
                   <Home />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <History />
+                </ProtectedRoute>
+              }
             />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
