@@ -77,13 +77,6 @@ Accédez ensuite à http://localhost:3000.
 4. Résumé stocké (`Summary`), lié au `Document` et à l'utilisateur.
 5. Le frontend récupère `/summaries/history/me` pour lister l'historique.
 
-## Mise à jour 2025-07
-
-- Passage de Hugging Face → Mistral API (plus stable, meilleur français).
-- Ajout de la page Historique + export PDF.
-- Nettoyage des secrets hard-codés.
-- Journalisation restreinte à `NODE_ENV !== 'production'.`
-
 ## Dépannage
 
 - **MongoDB** : service lancé ? port correct ?
